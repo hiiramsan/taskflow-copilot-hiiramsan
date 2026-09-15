@@ -177,6 +177,28 @@ class TaskControllerTest {
                 .andExpect(jsonPath("$.status").value(404));
     }
 
+    // ==================== GET /tasks/overdue (slice) ====================
+
+    @Test
+    void getOverdue_retorna200YListaOrdenada() throws Exception {
+        try {
+            Task old = new Task(7L, "Corregir bug de fechas", "desc", TaskStatus.IN_PROGRESS, Priority.MED, 1L, 1L,
+                    java.time.LocalDate.now().minusDays(2));
+            Task recent = new Task(9L, "Tarea reciente vencida", "desc", TaskStatus.TODO, Priority.MED, 1L, 1L,
+                    java.time.LocalDate.now().minusDays(1));
+            when(taskService.vencidas()).thenReturn(java.util.List.of(old, recent));
+
+            mockMvc.perform(get("/tasks/overdue"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(2))
+                    .andExpect(jsonPath("$[0].id").value(7))
+                    .andExpect(jsonPath("$[0].title").value("Corregir bug de fechas"))
+                    .andExpect(jsonPath("$[1].id").value(9));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     // ---- helpers de datos (reales, no mocks) ----
 
     private Task tarea(Long id, String title, TaskStatus status) {

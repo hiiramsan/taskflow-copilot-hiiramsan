@@ -158,6 +158,29 @@ class TaskServiceTest {
     }
 
     /** Fabrica una Task de rehidratación REAL (dato, no mock). assigneeId null = sin responsable. */
+    @Test
+    void vencidas_devuelveSoloVencidasYEnOrden() {
+        try {
+            Task vencidaA = new Task(10L, "VencidaA", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, 1L,
+                    java.time.LocalDate.now().minusDays(2));
+            Task vencidaB = new Task(11L, "VencidaB", "desc", TaskStatus.IN_PROGRESS, Priority.MED, PROYECTO, 1L,
+                    java.time.LocalDate.now().minusDays(1));
+            Task donePast = new Task(12L, "DonePast", "desc", TaskStatus.DONE, Priority.MED, PROYECTO, 1L,
+                    java.time.LocalDate.now().minusDays(5));
+            Task noDate = new Task(13L, "NoDate", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, 1L, null);
+
+            when(repository.findAll()).thenReturn(java.util.List.of(donePast, noDate, vencidaB, vencidaA));
+
+            java.util.List<Task> res = service.vencidas();
+
+            assertEquals(2, res.size());
+            assertEquals(vencidaA, res.get(0));
+            assertEquals(vencidaB, res.get(1));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private Task tarea(Long id, String title, Long assigneeId) {
         try {
             return new Task(id, title, "desc", TaskStatus.TODO, Priority.MED, PROYECTO, assigneeId, null);
