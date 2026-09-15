@@ -1,0 +1,9 @@
+et-Clipboard | Set-Content evidencia\dia2\usage.txt
+Add-Content evidencia\dia2\usage.txt '--- al empezar el dia (MP-2) ---'
+Get-Content $HOME\usage-dia2-inicio.txt | Add-Content evidencia\dia2\usage.txt
+Select-String -Path evidencia\dia2\usage.txt -Pattern '\d+ / [\d,]+ AIC'
+--- al empezar el dia (MP-2) ---
+Changes    +0 -0
+AI Credits 0 (12s)
+Plan       ■■■■■■■■■■■■■■■■■■■■ 1% used
+           16 / 1,500 AI
