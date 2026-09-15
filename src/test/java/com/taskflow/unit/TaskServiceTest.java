@@ -133,6 +133,43 @@ class TaskServiceTest {
     }
 
     @Nested
+    @DisplayName("SinResponsable")
+    class SinResponsable {
+
+        @Test
+        void sinResponsable_filtraYOrdenaCorrectamente() {
+            try {
+                Task a = new Task(100L, "A sin responsable 10d", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, null,
+                        java.time.LocalDate.now().plusDays(10));
+                Task b = new Task(101L, "B con responsable", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, 1L,
+                        java.time.LocalDate.now().plusDays(5));
+                Task c = new Task(102L, "C sin responsable sin fecha", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, null,
+                        null);
+                Task d = new Task(103L, "D sin responsable 2d", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, null,
+                        java.time.LocalDate.now().plusDays(2));
+                when(repository.findAll()).thenReturn(java.util.List.of(a, b, c, d));
+
+                java.util.List<Task> res = service.sinResponsable();
+
+                java.util.List<Long> ids = res.stream().map(Task::getId).toList();
+                assertEquals(java.util.List.of(103L, 100L, 102L), ids);
+            } catch (TaskValidationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Test
+        void sinResponsable_soloConResponsable_devuelveVacio() {
+            Task withAssignee = tarea(200L, "Con responsable", 1L);
+            when(repository.findAll()).thenReturn(java.util.List.of(withAssignee));
+
+            java.util.List<Task> res = service.sinResponsable();
+
+            assertEquals(0, res.size());
+        }
+    }
+
+    @Nested
     @DisplayName("eliminar")
     class Eliminar {
 
@@ -158,6 +195,29 @@ class TaskServiceTest {
     }
 
     /** Fabrica una Task de rehidratación REAL (dato, no mock). assigneeId null = sin responsable. */
+    @Test
+    void vencidas_devuelveSoloVencidasYEnOrden() {
+        try {
+            Task vencidaA = new Task(10L, "VencidaA", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, 1L,
+                    java.time.LocalDate.now().minusDays(2));
+            Task vencidaB = new Task(11L, "VencidaB", "desc", TaskStatus.IN_PROGRESS, Priority.MED, PROYECTO, 1L,
+                    java.time.LocalDate.now().minusDays(1));
+            Task donePast = new Task(12L, "DonePast", "desc", TaskStatus.DONE, Priority.MED, PROYECTO, 1L,
+                    java.time.LocalDate.now().minusDays(5));
+            Task noDate = new Task(13L, "NoDate", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, 1L, null);
+
+            when(repository.findAll()).thenReturn(java.util.List.of(donePast, noDate, vencidaB, vencidaA));
+
+            java.util.List<Task> res = service.vencidas();
+
+            assertEquals(2, res.size());
+            assertEquals(vencidaA, res.get(0));
+            assertEquals(vencidaB, res.get(1));
+        } catch (TaskValidationException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private Task tarea(Long id, String title, Long assigneeId) {
         try {
             return new Task(id, title, "desc", TaskStatus.TODO, Priority.MED, PROYECTO, assigneeId, null);
