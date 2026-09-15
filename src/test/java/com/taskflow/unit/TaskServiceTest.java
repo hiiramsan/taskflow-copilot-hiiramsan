@@ -133,6 +133,43 @@ class TaskServiceTest {
     }
 
     @Nested
+    @DisplayName("SinResponsable")
+    class SinResponsable {
+
+        @Test
+        void sinResponsable_filtraYOrdenaCorrectamente() {
+            try {
+                Task a = new Task(100L, "A sin responsable 10d", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, null,
+                        java.time.LocalDate.now().plusDays(10));
+                Task b = new Task(101L, "B con responsable", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, 1L,
+                        java.time.LocalDate.now().plusDays(5));
+                Task c = new Task(102L, "C sin responsable sin fecha", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, null,
+                        null);
+                Task d = new Task(103L, "D sin responsable 2d", "desc", TaskStatus.TODO, Priority.MED, PROYECTO, null,
+                        java.time.LocalDate.now().plusDays(2));
+                when(repository.findAll()).thenReturn(java.util.List.of(a, b, c, d));
+
+                java.util.List<Task> res = service.sinResponsable();
+
+                java.util.List<Long> ids = res.stream().map(Task::getId).toList();
+                assertEquals(java.util.List.of(103L, 100L, 102L), ids);
+            } catch (TaskValidationException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+
+        @Test
+        void sinResponsable_soloConResponsable_devuelveVacio() {
+            Task withAssignee = tarea(200L, "Con responsable", 1L);
+            when(repository.findAll()).thenReturn(java.util.List.of(withAssignee));
+
+            java.util.List<Task> res = service.sinResponsable();
+
+            assertEquals(0, res.size());
+        }
+    }
+
+    @Nested
     @DisplayName("eliminar")
     class Eliminar {
 

@@ -133,4 +133,15 @@ public class TaskService {
                 .sorted(TaskOrders.POR_FECHA)
                 .toList();
     }
+
+    /**
+     * Devuelve las tareas sin responsable de TODOS los proyectos, ordenadas por fecha ascendente
+     * (nulls al final). Reusa el predicado ReportService.SIN_ASIGNAR y el comparador POR_FECHA.
+     */
+    public List<Task> sinResponsable() {
+        return repository.findAll().stream()
+                .filter(ReportService.SIN_ASIGNAR)
+                .sorted(TaskOrders.POR_FECHA)
+                .toList();
+    }
 }
