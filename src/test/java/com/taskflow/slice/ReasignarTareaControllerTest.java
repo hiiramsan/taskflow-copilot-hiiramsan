@@ -3,7 +3,6 @@ package com.taskflow.slice;
 import com.taskflow.controller.TaskController;
 import com.taskflow.exception.TaskNotFoundException;
 import com.taskflow.exception.TaskStateException;
-import com.taskflow.exception.TaskValidationException;
 import com.taskflow.model.Priority;
 import com.taskflow.model.Task;
 import com.taskflow.model.TaskStatus;
@@ -48,7 +47,6 @@ class ReasignarTareaControllerTest {
 
     @Test
     void patchAssignee_exitoso_devuelve200YAssigneeId() throws Exception {
-        try {
             Task t = new Task(4L, "Escribir tests MockMvc", "desc", TaskStatus.TODO, Priority.MED, 1L, null,
                     java.time.LocalDate.now().plusDays(7));
             Task updated = new Task(4L, "Escribir tests MockMvc", "desc", TaskStatus.TODO, Priority.MED, 1L, 2L,
@@ -61,14 +59,10 @@ class ReasignarTareaControllerTest {
                             .content("{ \"assigneeId\": 2 }"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.assigneeId").value(2));
-        } catch (TaskValidationException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     @Test
     void patchAssignee_tareaTerminada_devuelve422() throws Exception {
-        try {
             Task done = new Task(2L, "Hecho", "d", TaskStatus.DONE, Priority.MED, 1L, 1L, null);
             when(taskService.buscarPorId(2L)).thenReturn(Optional.of(done));
             when(taskService.reasignar(any(), eq(3L)))
@@ -79,9 +73,6 @@ class ReasignarTareaControllerTest {
                             .content("{ \"assigneeId\": 3 }"))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.status").value(422));
-        } catch (TaskValidationException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     @Test

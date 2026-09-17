@@ -3,6 +3,7 @@ package com.taskflow.controller;
 import com.taskflow.dto.TaskRequest;
 import com.taskflow.dto.TaskResponse;
 import com.taskflow.dto.TaskStatusUpdateRequest;
+import com.taskflow.dto.TaskAssigneeUpdateRequest;
 import com.taskflow.exception.ProjectNotFoundException;
 import com.taskflow.exception.TaskNotFoundException;
 import com.taskflow.exception.TaskValidationException;
@@ -154,7 +155,7 @@ public class TaskController {
             description = "Cambia solo el assigneeId de la tarea. 404 si la tarea no existe; 422 si está DONE.")
     @PatchMapping("/tasks/{id}/assignee")
     public TaskResponse patchAssignee(@PathVariable("id") Long id,
-                                      @Valid @RequestBody com.taskflow.dto.TaskAssigneeUpdateRequest request) {
+                                      @Valid @RequestBody TaskAssigneeUpdateRequest request) {
         Task tarea = taskService.buscarPorId(id)
                 .orElseThrow(() -> new TaskNotFoundException(id));
         Task actualizada = taskService.reasignar(tarea, request.assigneeId());
