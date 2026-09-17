@@ -22,4 +22,11 @@ public final class ProjectMapper {
         return new ProjectResponse(p.getId(), p.getName(), p.getDescription(),
                 p.getOwnerId(), p.getCreatedAt());
     }
+
+    /** Mapea el resumen calculado por el service a DTO para la API. */
+    public static com.taskflow.dto.ProjectSummaryResponse aSummary(Project p, long totalTasks,
+                                                                    java.util.Map<String, Long> byStatus,
+                                                                    long overdue) {
+        return new com.taskflow.dto.ProjectSummaryResponse(p.getId(), p.getName(), totalTasks, byStatus, overdue);
+    }
 }

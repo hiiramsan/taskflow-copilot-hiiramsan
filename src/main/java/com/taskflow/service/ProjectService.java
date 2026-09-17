@@ -101,4 +101,20 @@ public class ProjectService {
         tareasDe(id).forEach(t -> taskRepository.deleteById(t.getId()));   // cascada manual (la FK obliga el orden)
         projectRepository.deleteById(id);
     }
+
+    /**
+     * Resumen de un proyecto: cuántas tareas tiene en total, por estado (siempre las tres claves)
+     * y cuántas están vencidas (Task.estaVencida()).
+     */
+    public com.taskflow.dto.ProjectSummaryResponse summary(Project proyecto) {
+        java.util.List<com.taskflow.model.Task> tareas = taskRepository.findByProjectId(proyecto.getId());
+        long total = tareas.size();
+        java.util.Map<String, Long> byStatus = java.util.Arrays.stream(com.taskflow.model.TaskStatus.values())
+                .collect(java.util.stream.Collectors.toMap(
+                        ts -> ts.name(),
+                        ts -> tareas.stream().filter(t -> t.getStatus() == ts).count()
+                ));
+        long overdue = tareas.stream().filter(com.taskflow.model.Task::estaVencida).count();
+        return com.taskflow.mapper.ProjectMapper.aSummary(proyecto, total, byStatus, overdue);
+    }
 }
