@@ -1,0 +1,230 @@
+diff --git a/src/main/java/com/taskflow/controller/TaskController.java b/src/main/java/com/taskflow/controller/TaskController.java
+index 1668672..3749454 100644
+--- a/src/main/java/com/taskflow/controller/TaskController.java
++++ b/src/main/java/com/taskflow/controller/TaskController.java
+@@ -3,6 +3,7 @@ package com.taskflow.controller;
+ import com.taskflow.dto.TaskRequest;
+ import com.taskflow.dto.TaskResponse;
+ import com.taskflow.dto.TaskStatusUpdateRequest;
++import com.taskflow.dto.TaskAssigneeUpdateRequest;
+ import com.taskflow.exception.ProjectNotFoundException;
+ import com.taskflow.exception.TaskNotFoundException;
+ import com.taskflow.exception.TaskValidationException;
+@@ -149,4 +150,15 @@ public class TaskController {
+         Task actualizada = taskService.cambiarStatus(id, request.status());
+         return TaskMapper.aResponse(actualizada);
+     }
++
++    @Operation(summary = "Reasigna el responsable de una tarea",
++            description = "Cambia solo el assigneeId de la tarea. 404 si la tarea no existe; 422 si está DONE.")
++    @PatchMapping("/tasks/{id}/assignee")
++    public TaskResponse patchAssignee(@PathVariable("id") Long id,
++                                      @Valid @RequestBody TaskAssigneeUpdateRequest request) {
++        Task tarea = taskService.buscarPorId(id)
++                .orElseThrow(() -> new TaskNotFoundException(id));
++        Task actualizada = taskService.reasignar(tarea, request.assigneeId());
++        return TaskMapper.aResponse(actualizada);
++    }
+ }
+diff --git a/src/main/java/com/taskflow/dto/TaskAssigneeUpdateRequest.java b/src/main/java/com/taskflow/dto/TaskAssigneeUpdateRequest.java
+new file mode 100644
+index 0000000..3dfa128
+--- /dev/null
++++ b/src/main/java/com/taskflow/dto/TaskAssigneeUpdateRequest.java
+@@ -0,0 +1,14 @@
++package com.taskflow.dto;
++
++import jakarta.validation.constraints.NotNull;
++import jakarta.validation.constraints.Positive;
++
++/**
++ * DTO de entrada para reasignar el responsable de una tarea. Valida que assigneeId esté presente y
++ * sea un número positivo.
++ */
++public record TaskAssigneeUpdateRequest(
++        @NotNull
++        @Positive
++        Long assigneeId) {
++}
+diff --git a/src/main/java/com/taskflow/service/TaskService.java b/src/main/java/com/taskflow/service/TaskService.java
+index aa65c52..7b7a95b 100644
+--- a/src/main/java/com/taskflow/service/TaskService.java
++++ b/src/main/java/com/taskflow/service/TaskService.java
+@@ -144,4 +144,16 @@ public class TaskService {
+                 .sorted(TaskOrders.POR_FECHA)
+                 .toList();
+     }
++
++    /**
++     * Reasigna el responsable de una tarea ya encontrada. Lanza TaskStateException si la tarea
++     * está en estado DONE (no se puede reasignar una tarea terminada).
++     */
++    public Task reasignar(Task tarea, Long assigneeId) {
++        if (tarea.getStatus() == TaskStatus.DONE) {
++            throw new TaskStateException("No se puede reasignar una tarea terminada.");
++        }
++        tarea.setAssigneeId(assigneeId);
++        return repository.save(tarea);
++    }
+ }
+diff --git a/src/test/java/com/taskflow/slice/ReasignarTareaControllerTest.java b/src/test/java/com/taskflow/slice/ReasignarTareaControllerTest.java
+new file mode 100644
+index 0000000..76bb242
+--- /dev/null
++++ b/src/test/java/com/taskflow/slice/ReasignarTareaControllerTest.java
+@@ -0,0 +1,98 @@
++package com.taskflow.slice;
++
++import com.taskflow.controller.TaskController;
++import com.taskflow.exception.TaskNotFoundException;
++import com.taskflow.exception.TaskStateException;
++import com.taskflow.model.Priority;
++import com.taskflow.model.Task;
++import com.taskflow.model.TaskStatus;
++import com.taskflow.security.JwtAuthenticationFilter;
++import com.taskflow.service.ProjectService;
++import com.taskflow.service.TaskService;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
++import org.springframework.http.MediaType;
++import org.springframework.test.context.bean.override.mockito.MockitoBean;
++import org.springframework.test.web.servlet.MockMvc;
++
++import java.util.Optional;
++
++import static org.hamcrest.Matchers.nullValue;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++@WebMvcTest(TaskController.class)
++@AutoConfigureMockMvc(addFilters = false)
++class ReasignarTareaControllerTest {
++
++    @Autowired
++    private MockMvc mockMvc;
++
++    @MockitoBean
++    private TaskService taskService;
++
++    @MockitoBean
++    private ProjectService projectService;
++
++    @MockitoBean
++    private JwtAuthenticationFilter jwtAuthenticationFilter;
++
++    @Test
++    void patchAssignee_exitoso_devuelve200YAssigneeId() throws Exception {
++            Task t = new Task(4L, "Escribir tests MockMvc", "desc", TaskStatus.TODO, Priority.MED, 1L, null,
++                    java.time.LocalDate.now().plusDays(7));
++            Task updated = new Task(4L, "Escribir tests MockMvc", "desc", TaskStatus.TODO, Priority.MED, 1L, 2L,
++                    java.time.LocalDate.now().plusDays(7));
++            when(taskService.buscarPorId(4L)).thenReturn(Optional.of(t));
++            when(taskService.reasignar(any(), eq(2L))).thenReturn(updated);
++
++            mockMvc.perform(patch("/tasks/4/assignee")
++                            .contentType(MediaType.APPLICATION_JSON)
++                            .content("{ \"assigneeId\": 2 }"))
++                    .andExpect(status().isOk())
++                    .andExpect(jsonPath("$.assigneeId").value(2));
++    }
++
++    @Test
++    void patchAssignee_tareaTerminada_devuelve422() throws Exception {
++            Task done = new Task(2L, "Hecho", "d", TaskStatus.DONE, Priority.MED, 1L, 1L, null);
++            when(taskService.buscarPorId(2L)).thenReturn(Optional.of(done));
++            when(taskService.reasignar(any(), eq(3L)))
++                    .thenThrow(new TaskStateException("No se puede reasignar una tarea terminada."));
++
++            mockMvc.perform(patch("/tasks/2/assignee")
++                            .contentType(MediaType.APPLICATION_JSON)
++                            .content("{ \"assigneeId\": 3 }"))
++                    .andExpect(status().isUnprocessableEntity())
++                    .andExpect(jsonPath("$.status").value(422));
++    }
++
++    @Test
++    void patchAssignee_inexistente_devuelve404() throws Exception {
++        when(taskService.buscarPorId(99L)).thenReturn(Optional.empty());
++
++        mockMvc.perform(patch("/tasks/99/assignee")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{ \"assigneeId\": 2 }"))
++                .andExpect(status().isNotFound())
++                .andExpect(jsonPath("$.status").value(404));
++    }
++
++    @Test
++    void patchAssignee_bodyInvalido_devuelve400_yNoLlamaServicio() throws Exception {
++        mockMvc.perform(patch("/tasks/6/assignee")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{}"))
++                .andExpect(status().isBadRequest());
++
++        verify(taskService, never()).reasignar(any(), any());
++    }
++}
+diff --git a/src/test/java/com/taskflow/unit/ReasignarTareaServiceTest.java b/src/test/java/com/taskflow/unit/ReasignarTareaServiceTest.java
+new file mode 100644
+index 0000000..d6e0079
+--- /dev/null
++++ b/src/test/java/com/taskflow/unit/ReasignarTareaServiceTest.java
+@@ -0,0 +1,51 @@
++package com.taskflow.unit;
++
++import com.taskflow.exception.TaskStateException;
++import com.taskflow.model.Priority;
++import com.taskflow.model.Task;
++import com.taskflow.model.TaskStatus;
++import com.taskflow.repository.TaskRepository;
++import com.taskflow.service.TaskService;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.ArgumentCaptor;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.junit.jupiter.MockitoExtension;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.never;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++class ReasignarTareaServiceTest {
++
++    @Mock
++    private TaskRepository repository;
++
++    @InjectMocks
++    private TaskService service;
++
++    @Test
++    void reasignar_tareaTODO_sinResponsable_guardaConAssignee() throws Exception {
++        Task t = new Task(1L, "Tarea", "d", TaskStatus.TODO, Priority.MED, 1L, null, null);
++        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
++        ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
++
++        service.reasignar(t, 2L);
++
++        verify(repository).save(captor.capture());
++        assertEquals(2L, captor.getValue().getAssigneeId());
++    }
++
++    @Test
++    void reasignar_tareaDONE_lanzaYNoGuarda() throws Exception {
++        Task t = new Task(2L, "Hecho", "d", TaskStatus.DONE, Priority.MED, 1L, 1L, null);
++
++        assertThrows(TaskStateException.class, () -> service.reasignar(t, 3L));
++        verify(repository, never()).save(any());
++    }
++}
